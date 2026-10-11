@@ -113,8 +113,8 @@ function geminiSchema(s: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-async function readWithGemini(images: Image[], prompt: string): Promise<Fields> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+async function readWithGemini(images: Image[], prompt: string, model = GEMINI_MODEL): Promise<Fields> {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY ?? '' },
     body: JSON.stringify({
@@ -122,6 +122,8 @@ async function readWithGemini(images: Image[], prompt: string): Promise<Fields> 
       generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(RECIPE_TOOL.input_schema), temperature: 0 },
     }),
   });
+  // Google retires model versions; fall back to whatever its current Flash model is.
+  if (res.status === 404 && model !== 'gemini-flash-latest') return readWithGemini(images, prompt, 'gemini-flash-latest');
   if (!res.ok) {
     console.error('scan failed (gemini)', res.status, await res.text().catch(() => ''));
     return 'failed';
