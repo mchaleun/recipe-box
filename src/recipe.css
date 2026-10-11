@@ -247,3 +247,15 @@ textarea::placeholder, input::placeholder { color: var(--text-3); }
 .settings { max-width: 720px; }
 .settings .list-row input.inline { font-size: 17px; }
 .icon-btn:disabled { color: var(--text-3); opacity: 0.5; cursor: default; background: none; }
+
+/* Scan a recipe (new recipes, online only) */
+.scan-card { display: flex; align-items: center; gap: 14px; padding: 16px; margin-bottom: 20px; border-radius: var(--radius); background: var(--accent-soft); flex-wrap: wrap; }
+.scan-card .grow { flex: 1 1 220px; min-width: 0; }
+.scan-card h2 { font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+.scan-card p { font-size: 15px; }
+.scan-card .btn { flex: none; min-width: 150px; }
+.scan-glyph { width: 48px; height: 48px; border-radius: 14px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
+.scan-note { margin: -8px 0 20px; padding: 12px 14px; border-radius: 12px; background: var(--fill); font-size: 15px; }
+.spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; display: inline-block; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 520px) { .scan-card .btn { width: 100%; } }

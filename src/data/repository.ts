@@ -90,6 +90,8 @@ export interface ServerInfo {
   online?: boolean;
   /** The family passcode is required to read or change recipes. */
   auth?: boolean;
+  /** Recipe photos can be scanned into new recipes. */
+  scan?: boolean;
 }
 
 /** Talks to the shared library (the home server in server/index.mjs, or the

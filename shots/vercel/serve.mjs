@@ -6,6 +6,7 @@ const fns = {
   '/api/library': await import('./out/library.mjs'),
   '/api/photo': await import('./out/photo.mjs'),
   '/api/health': await import('./out/health.mjs'),
+  '/api/scan': await import('./out/scan.mjs'),
 };
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 createServer(async (req, res) => {

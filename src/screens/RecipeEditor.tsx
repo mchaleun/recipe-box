@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon';
 import { RecipeArt, Sheet, TopBar, useToast } from '../components/ui';
 import { goBack, navigate } from '../router';
 import { formatMinutes } from '../lib/time';
-import { uid } from '../data/repository';
+import { getServerInfo, savedPasscode, uid } from '../data/repository';
 
 function blankRecipe(): Recipe {
   const now = Date.now();
@@ -58,6 +58,71 @@ function readPhoto(file: File, max = 1600): Promise<string> {
 }
 
 type Line = Ingredient | Step;
+
+interface Scanned {
+  title?: string; description?: string; servings?: number; yieldUnit?: string;
+  prepMinutes?: number; cookMinutes?: number; ingredients?: string[]; steps?: string[];
+  notes?: string; categories?: string[]; cuisine?: string; tags?: string[]; unreadable?: string;
+}
+
+const toLines = (items: string[] = []): Line[] =>
+  items.map((t) => t.trim()).filter(Boolean).map((t) =>
+    /^#+\s*/.test(t) ? { id: uid(), text: t.replace(/^#+\s*/, '').replace(/:$/, ''), heading: true } : { id: uid(), text: t });
+
+/** Sends photos of a recipe to /api/scan and returns the fields it read. */
+async function scanPhotos(files: File[], categories: string[]): Promise<Scanned> {
+  const images = await Promise.all(files.slice(0, 4).map((f) => readPhoto(f, 1600)));
+  const res = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-family-passcode': savedPasscode() },
+    body: JSON.stringify({ images, categories }),
+  }).catch(() => null);
+  if (!res) throw new Error('Can’t reach the recipe box right now. Check the internet connection.');
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error ?? 'Couldn’t read that photo. Try again.');
+  return out.recipe as Scanned;
+}
+
+/** "Scan a recipe": a photo of a recipe card or cookbook page fills in the new recipe. */
+function ScanCard({ onScanned }: { onScanned: (r: Scanned) => void }) {
+  const { state } = useStore();
+  const [available, setAvailable] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { getServerInfo().then((i) => setAvailable(!!i?.scan)); }, []);
+  if (!available) return null;
+
+  const run = async (files: File[]) => {
+    if (!files.length) return;
+    setBusy(true);
+    setError('');
+    try { onScanned(await scanPhotos(files, state.categories.map((c) => c.name))); }
+    catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="scan-card" aria-busy={busy}>
+      <span className="scan-glyph"><Icon name="scan" size={26} /></span>
+      <div className="grow">
+        <h2>{busy ? 'Reading the recipe…' : 'Scan a Recipe'}</h2>
+        <p className="secondary">{busy
+          ? 'This takes a few seconds. You can check everything before adding it.'
+          : 'Take a photo of a recipe card or cookbook page and the details fill in for you. Long recipes can use up to 4 photos.'}</p>
+        {error && <p className="footnote" role="alert" style={{ color: 'var(--danger)', marginTop: 6 }}>{error}</p>}
+      </div>
+      <button className="btn primary" disabled={busy} onClick={() => input.current?.click()}>
+        {busy ? <span className="spinner" aria-label="Reading" /> : 'Choose Photos'}
+      </button>
+      <input ref={input} id="scan-input" type="file" accept="image/*" multiple hidden onChange={(e) => {
+        const files = [...(e.target.files ?? [])];
+        e.target.value = '';
+        run(files);
+      }} />
+    </div>
+  );
+}
 
 function linesToText(lines: Line[]): string {
   return lines.filter((l) => l.text.trim()).map((l) => (l.heading ? `## ${l.text}` : l.text)).join('\n');
@@ -199,6 +264,7 @@ export function RecipeEditor({ id }: { id: string }) {
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [scanNote, setScanNote] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof Recipe>(k: K, v: Recipe[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -224,6 +290,29 @@ export function RecipeEditor({ id }: { id: string }) {
   };
   const cancel = () => (dirty ? setConfirmDiscard(true) : goBack(isNew ? { name: 'library' } : { name: 'recipe', id }));
 
+  const applyScan = (r: Scanned) => {
+    const n = (v?: number) => (v && v > 0 ? Math.round(v) : undefined);
+    const byName = new Map(state.categories.map((c) => [c.name.toLowerCase(), c.id]));
+    setDraft((d) => ({
+      ...d,
+      title: r.title?.trim() || d.title,
+      description: r.description?.trim() || d.description,
+      servings: n(r.servings) ?? d.servings,
+      yieldUnit: r.yieldUnit?.trim() || d.yieldUnit,
+      prepMinutes: n(r.prepMinutes) ?? d.prepMinutes,
+      cookMinutes: n(r.cookMinutes) ?? d.cookMinutes,
+      ingredients: r.ingredients?.length ? toLines(r.ingredients) : d.ingredients,
+      steps: r.steps?.length ? toLines(r.steps) : d.steps,
+      notes: r.notes?.trim() || d.notes,
+      cuisine: r.cuisine?.trim() || d.cuisine,
+      categoryIds: [...new Set([...d.categoryIds, ...(r.categories ?? []).map((c) => byName.get(c.toLowerCase())).filter((id): id is string => !!id)])],
+      tags: [...new Set([...d.tags, ...(r.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean)])].slice(0, 8),
+      source: d.source ?? { label: 'Scanned recipe' },
+    }));
+    setScanNote(r.unreadable?.trim() ?? '');
+    toast({ text: 'Recipe filled in. Check it, then tap Add.' });
+  };
+
   const addTag = (raw: string) => {
     const t = raw.trim().replace(/^#/, '').toLowerCase();
     if (t && !draft.tags.includes(t)) set('tags', [...draft.tags, t]);
@@ -239,6 +328,8 @@ export function RecipeEditor({ id }: { id: string }) {
         end={<button className="text-btn strong" onClick={save} disabled={!draft.title.trim()}>{isNew ? 'Add' : 'Done'}</button>}
       />
       <div className="page editor page-enter">
+        {isNew && <ScanCard onScanned={applyScan} />}
+        {scanNote && <p className="scan-note"><strong>Couldn’t read clearly:</strong> {scanNote}</p>}
         <div className="ed-top">
           <div className="ed-photo">
             <button className="ed-photo-btn" onClick={() => fileRef.current?.click()} aria-label={draft.photo ? 'Change photo' : 'Add photo'}>
