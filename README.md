@@ -53,6 +53,9 @@ Pushing to `main` on GitHub deploys automatically.
 - `FAMILY_PASSCODE` (Vercel → Settings → Environment Variables) is the passcode each
   device asks for once. Change it there and redeploy; devices then ask again.
   Capitals and spaces don't matter.
+- Scan a Recipe (`api/scan.ts`) reads recipe photos with Google Gemini when `GEMINI_API_KEY`
+  is set (free key from aistudio.google.com, no card). Without it, it falls back to Vercel
+  AI Gateway, which needs a card on the Vercel account.
 - Writes are batched (3 s) and other devices pick up changes when the app is reopened
   or every 2 minutes, to stay well inside the free storage limits.
 
