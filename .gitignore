@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-preview
+.test
+*.tsbuildinfo
+data
+.vercel
+shots/*.png
+shots/vercel/out
+shots/vercel/*.png
+shots/vercel/pid
+shots/vercel/log.txt

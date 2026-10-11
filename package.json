@@ -1,0 +1,27 @@
+{
+  "name": "recipe-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:preview": "tsc -b && vite build --mode preview && node scripts/make-artifact.mjs",
+    "test": "esbuild src/lib/logic.test.ts --bundle --platform=node --format=esm --outfile=.test/logic.test.mjs --log-level=warning && node --test .test/logic.test.mjs",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.8.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@vitejs/plugin-react": "4.6.0",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vite-plugin-singlefile": "2.2.0"
+  }
+}
