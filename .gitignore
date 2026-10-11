@@ -3,7 +3,7 @@ dist
 dist-preview
 .test
 *.tsbuildinfo
-data
+/data
 .vercel
 shots/*.png
 shots/vercel/out
