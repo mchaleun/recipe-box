@@ -113,22 +113,30 @@ function geminiSchema(s: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-async function readWithGemini(images: Image[], prompt: string, model = GEMINI_MODEL): Promise<Fields> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY ?? '' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [...images.map((i) => ({ inline_data: { mime_type: i.type, data: i.data } })), { text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(RECIPE_TOOL.input_schema), temperature: 0 },
-    }),
-  });
-  // Google retires model versions; fall back to whatever its current Flash model is.
-  if (res.status === 404 && model !== 'gemini-flash-latest') return readWithGemini(images, prompt, 'gemini-flash-latest');
-  if (!res.ok) {
-    console.error('scan failed (gemini)', res.status, await res.text().catch(() => ''));
-    return 'failed';
+// Google's free tier is sometimes busy (503) or rate-limited (429), and retires
+// model versions (404); try the next Flash model before giving up.
+const GEMINI_FALLBACKS = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+
+async function readWithGemini(images: Image[], prompt: string): Promise<Fields> {
+  const models = [...new Set([GEMINI_MODEL, ...GEMINI_FALLBACKS])];
+  for (const model of models) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY ?? '' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [...images.map((i) => ({ inline_data: { mime_type: i.type, data: i.data } })), { text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: geminiSchema(RECIPE_TOOL.input_schema), temperature: 0 },
+      }),
+    });
+    if (!res.ok) {
+      console.error(`scan failed (gemini ${model})`, res.status, await res.text().catch(() => ''));
+      if ([404, 429, 500, 503].includes(res.status)) continue;
+      return 'failed';
+    }
+    const out = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const text = out.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+    try { return JSON.parse(text) as Record<string, unknown>; } catch { return 'failed'; }
   }
-  const out = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = out.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-  try { return JSON.parse(text) as Record<string, unknown>; } catch { return 'failed'; }
+  return 'failed';
 }
+export const maxDuration = 60;
