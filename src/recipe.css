@@ -301,3 +301,11 @@ textarea::placeholder, input::placeholder { color: var(--text-3); }
   .cmp-colnames, .cmp-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cmp-steps li:not(.cmp-col-title):not(.cmp-step-heading) { font-size: 16px; }
 }
+
+/* Versions of the same dish */
+.versions { margin-top: 4px; }
+.versions-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.versions-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); }
+.versions-head .text-btn { display: inline-flex; align-items: center; gap: 6px; }
+.versions-chips { flex-wrap: wrap; margin-inline: 0; padding-inline: 0; padding-block: 8px 0; }
+.card-versions { color: var(--accent-text); font-weight: 600; }

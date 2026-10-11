@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { emptyFilters, type Filters, type Recipe, type SortKey } from '../types';
 import { applyFilters, searchRecipes, sortRecipes, SORT_LABELS, usage } from '../lib/search';
+import { oneCardPerDish } from '../lib/versions';
 import { Icon } from '../components/Icon';
 import { EmptyState, Link, Menu, RecipeCard, Sheet } from '../components/ui';
 import { AlbumTile } from './Collections';
@@ -51,10 +52,15 @@ export function Library() {
     return sortRecipes(list, sort);
   }, [recipes, state.categories, query, category, filters, sort]);
 
+  // While browsing, versions of a dish share one card; a search shows every version.
+  const cards = useMemo(
+    () => (query.trim() ? results.map((recipe) => ({ recipe, versions: 1 })) : oneCardPerDish(results, recipes)),
+    [results, recipes, query],
+  );
   const usedCategories = state.categories.filter((c) => recipes.some((r) => r.categoryIds.includes(c.id)));
   const recentlyViewed = sortRecipes(recipes.filter((r) => r.lastViewedAt), 'viewed').slice(0, 10);
   const favorites = recipes.filter((r) => r.favorite);
-  const recentlyAdded = sortRecipes(recipes, 'recent').slice(0, 10);
+  const recentlyAdded = oneCardPerDish(sortRecipes(recipes, 'recent'), recipes).slice(0, 10).map((c) => c.recipe);
   const mostUsed = [...recipes].filter((r) => usage(r) > 0).sort((a, b) => usage(b) - usage(a)).slice(0, 10);
 
   return (
@@ -128,7 +134,7 @@ export function Library() {
             </div>
             <Toolbar count={results.length} sort={sort} setSort={setSort} filterCount={filterCount} openFilters={() => setFilterOpen(true)} />
             <div className="grid" style={{ marginTop: 12 }}>
-              {results.map((r) => <RecipeCard key={r.id} recipe={r} />)}
+              {cards.map((c) => <RecipeCard key={c.recipe.id} recipe={c.recipe} versions={c.versions} />)}
             </div>
           </section>
         </>
@@ -138,7 +144,7 @@ export function Library() {
           {filterCount > 0 && <ActiveFilters filters={filters} setFilters={setFilters} />}
           {results.length ? (
             <div className="grid" style={{ marginTop: 12 }}>
-              {results.map((r) => <RecipeCard key={r.id} recipe={r} />)}
+              {cards.map((c) => <RecipeCard key={c.recipe.id} recipe={c.recipe} versions={c.versions} />)}
             </div>
           ) : (
             <EmptyState icon="search" title="No Results" action={

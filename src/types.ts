@@ -47,6 +47,10 @@ export interface Recipe {
   steps: Step[];
   notes: string;
   source?: RecipeSource;
+  /** Recipes that share a family are versions of the same dish (from one comparison sheet). */
+  family?: string;
+  /** Short name of this version, e.g. "Preppy Kitchen". */
+  version?: string;
   favorite: boolean;
   createdAt: number;
   updatedAt: number;

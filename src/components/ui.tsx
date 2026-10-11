@@ -126,7 +126,7 @@ export function FavoriteButton({ recipe, className = 'fav-btn' }: { recipe: Reci
   );
 }
 
-export function RecipeCard({ recipe }: { recipe: Recipe }) {
+export function RecipeCard({ recipe, versions = 1 }: { recipe: Recipe; versions?: number }) {
   const { state } = useStore();
   return (
     <Link to={{ name: 'recipe', id: recipe.id }} className="card">
@@ -136,7 +136,10 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
       </div>
       <div className="card-body">
         <div className="card-title">{recipe.title}</div>
-        <div className="card-meta">{recipeMeta(recipe, state.categories, ['category', 'time', 'difficulty'])}</div>
+        <div className="card-meta">
+          {versions > 1 && <span className="card-versions">{versions} versions · </span>}
+          {recipeMeta(recipe, state.categories, ['category', 'time', 'difficulty'])}
+        </div>
       </div>
     </Link>
   );

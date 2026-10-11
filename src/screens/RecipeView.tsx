@@ -9,6 +9,7 @@ import { scaleIngredient } from '../lib/quantity';
 import { AddToCollectionSheet, CheckCircle } from './Collections';
 import { ComparePicker } from './Compare';
 import { searchFor } from './searchLink';
+import { versionLabel, versionsOf } from '../lib/versions';
 
 export function ServingsStepper({ value, base, unit, onChange, large }: { value: number; base: number; unit?: string; onChange: (n: number) => void; large?: boolean }) {
   const label = unit ?? 'servings';
@@ -63,6 +64,7 @@ export function RecipeView({ id }: { id: string }) {
   const progress = useProgress(recipe);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -85,6 +87,12 @@ export function RecipeView({ id }: { id: string }) {
   const stepItems = recipe.steps.filter((s) => !s.heading);
   const doneSteps = stepItems.filter((s) => progress.checkedSteps.has(s.id)).length;
   const inCollections = state.collections.filter((c) => c.recipeIds.includes(recipe.id));
+  const versions = versionsOf(state.recipes, recipe);
+  const otherVersions = versions.filter((v) => v.id !== recipe.id);
+  const compareVersions = () => {
+    if (otherVersions.length === 1) navigate({ name: 'compare', a: recipe.id, b: otherVersions[0].id });
+    else setVersionsOpen(true);
+  };
 
   const duplicate = () => {
     const copy: Recipe = {
@@ -131,6 +139,26 @@ export function RecipeView({ id }: { id: string }) {
             <div className="eyebrow">{[...categories, recipe.cuisine].filter(Boolean).join(' · ')}</div>
             <h1 className="recipe-title">{recipe.title}</h1>
             {recipe.description && <p className="recipe-desc">{recipe.description}</p>}
+            {versions.length > 1 && (
+              <div className="versions">
+                <div className="versions-head">
+                  <span className="versions-title">{versions.length} Versions</span>
+                  <button className="text-btn" onClick={compareVersions}><Icon name="columns" size={18} /> Compare Versions</button>
+                </div>
+                <div className="chips versions-chips" role="group" aria-label="Versions of this recipe">
+                  {versions.map((v) => (
+                    <button
+                      key={v.id}
+                      className={`chip${v.id === recipe.id ? ' on' : ''}`}
+                      aria-current={v.id === recipe.id ? 'true' : undefined}
+                      onClick={() => v.id !== recipe.id && navigate({ name: 'recipe', id: v.id }, { replace: true })}
+                    >
+                      {versionLabel(v)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <dl className="facts">
               <div><dt>Prep</dt><dd>{formatMinutes(recipe.prepMinutes)}</dd></div>
               <div><dt>Cook</dt><dd>{formatMinutes(recipe.cookMinutes)}</dd></div>
@@ -236,6 +264,7 @@ export function RecipeView({ id }: { id: string }) {
       </article>
 
       <AddToCollectionSheet open={collectionOpen} onClose={() => setCollectionOpen(false)} recipe={recipe} />
+      <ComparePicker open={versionsOpen} onClose={() => setVersionsOpen(false)} title="Compare Versions" exclude={[recipe.id]} only={otherVersions.map((v) => v.id)} onPick={(other) => { setVersionsOpen(false); navigate({ name: 'compare', a: recipe.id, b: other }); }} />
       <ComparePicker open={compareOpen} onClose={() => setCompareOpen(false)} exclude={[recipe.id]} onPick={(other) => { setCompareOpen(false); navigate({ name: 'compare', a: recipe.id, b: other }); }} />
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete “${recipe.title}”?`} footer={
         <>

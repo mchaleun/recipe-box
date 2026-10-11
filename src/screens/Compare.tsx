@@ -10,15 +10,17 @@ import { searchRecipes, sortRecipes } from '../lib/search';
 import { matchIngredients, type IngredientRow } from '../lib/compare';
 
 /** Picks the recipe to compare with (or to swap one side for). */
-export function ComparePicker({ open, onClose, exclude, onPick, title = 'Compare With…' }: {
+export function ComparePicker({ open, onClose, exclude, onPick, title = 'Compare With…', only }: {
   open: boolean; onClose: () => void; exclude: string[]; onPick: (id: string) => void; title?: string;
+  /** Limit the choices to these recipes, e.g. the other versions of a dish. */
+  only?: string[];
 }) {
   const { state } = useStore();
   const [q, setQ] = useState('');
   const list = useMemo(() => {
-    const pool = state.recipes.filter((r) => !exclude.includes(r.id));
+    const pool = state.recipes.filter((r) => !exclude.includes(r.id) && (!only || only.includes(r.id)));
     return q.trim() ? searchRecipes(pool, state.categories, q) : sortRecipes(pool, 'name');
-  }, [q, state.recipes, state.categories, exclude]);
+  }, [q, state.recipes, state.categories, exclude, only]);
   return (
     <Sheet open={open} onClose={onClose} title={title} headEnd={<button className="text-btn" onClick={onClose}>Cancel</button>}>
       <div className="search" style={{ marginTop: 0, position: 'sticky', top: 0, zIndex: 1, background: 'var(--bg-elevated)', paddingBottom: 8 }}>

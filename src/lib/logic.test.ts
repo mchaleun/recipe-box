@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { scaleIngredient, formatAmount, parseLeadingAmount } from './quantity';
 import { parseQuery, searchRecipes } from './search';
 import { detectTimers } from './time';
-import { seedRecipes, seedCategories, seedCollections } from '../data/seed';
+import { seedRecipes, seedCategories, seedCollections, seedSnapshot } from '../data/seed';
+import { upgradeSeed } from '../data/upgrade';
+import { oneCardPerDish, versionLabel, versionsOf } from './versions';
 
 test('formats amounts', () => {
   assert.equal(formatAmount(1.5), '1½');
@@ -31,14 +33,16 @@ test('parses natural queries', () => {
 
 test('searches the library', () => {
   const titles = (q: string) => searchRecipes(seedRecipes, seedCategories, q).map((r) => r.title);
-  assert.ok(titles('pumpkin').includes('Pumpkin Roll'));
+  assert.ok(titles('pumpkin').includes('Pumpkin Roll (Libby’s)'));
   assert.ok(titles('sourdough').includes('Sourdough Bread'));
   assert.ok(titles('beef recipes').includes('Smoked Brisket'));
-  assert.ok(titles('chocolate cake').includes('The Best Chocolate Cake'));
+  assert.ok(titles('chocolate cake').includes('Chocolate Cake (The Best Ever)'));
   assert.ok(!titles('under 30 minutes').includes('Smoked Brisket'));
   assert.ok(titles('under 30 minutes').includes('Small-Batch Hot Fudge'));
+  assert.equal(titles('chocolate chip cookies').filter((t) => t.startsWith('Chocolate Chip Cookies')).length, 4);
+  assert.ok(titles('molasses').includes('Molasses Cookies (Preppy Kitchen)'));
   assert.ok(titles('kahlua').includes('French Chocolate Mousse'));
-  assert.ok(titles('mascarpone').includes('Berry Chantilly Cake'));
+  assert.ok(titles('mascarpone').includes('Berry Chantilly Cake (Cakes by MK)'));
 });
 
 test('library has unique ids and every collection points at real recipes', () => {
@@ -64,4 +68,34 @@ test('compare lines up matching ingredients', async () => {
   assert.deepEqual(both.map((r) => [r.a?.text, r.b?.text]), [['¾ cup packed brown sugar', '1 cup brown sugar'], ['2 large eggs', '1 egg + 1 yolk']]);
   assert.deepEqual(onlyA.map((r) => r.a?.text), ['¾ cup granulated sugar', '1 tsp baking soda']);
   assert.deepEqual(onlyB.map((r) => r.b?.text), ['1 tsp baking powder']);
+});
+
+test('comparison sheets become versions of one dish', () => {
+  const molasses = seedRecipes.find((r) => r.id === 'molasses-cookies')!;
+  assert.deepEqual(versionsOf(seedRecipes, molasses).map(versionLabel).sort(), ['ChatGPT', 'ChatGPT Chewy', 'King Arthur', 'Preppy Kitchen']);
+  const chip = seedRecipes.filter((r) => r.family === 'chocolate-chip-cookies').map((r) => r.title);
+  assert.ok(chip.includes('Chocolate Chip Cookies (Hershey’s)') && chip.length === 4);
+  const cards = oneCardPerDish(seedRecipes, seedRecipes);
+  assert.equal(cards.filter((c) => c.recipe.family === 'molasses-cookies').length, 1);
+  assert.equal(cards.find((c) => c.recipe.family === 'molasses-cookies')!.versions, 4);
+  for (const r of seedRecipes.filter((x) => x.family)) assert.ok(r.version, `${r.id} has a version label`);
+});
+
+test('upgrading an older library adds versions and keeps edits', () => {
+  const old = seedSnapshot();
+  old.seedVersion = 2;
+  old.recipes = old.recipes.filter((r) => !r.family || r.id === r.family || ['best-chocolate-cake', 'fluffy-butter-chocolate-cake', 'bakery-chocolate-cake'].includes(r.id))
+    .map(({ family, version, ...r }) => r);
+  const edited = old.recipes.find((r) => r.id === 'pumpkin-roll')!;
+  Object.assign(edited, { title: 'Mom’s Pumpkin Roll', updatedAt: edited.createdAt + 5000 });
+  const viewed = old.recipes.find((r) => r.id === 'molasses-cookies')!;
+  Object.assign(viewed, { title: 'Chewy Molasses Cookies', favorite: true, viewCount: 3 });
+  const up = upgradeSeed(old);
+  const byId = (id: string) => up.recipes.find((r) => r.id === id)!;
+  assert.equal(up.recipes.length, seedRecipes.length);
+  assert.equal(byId('pumpkin-roll').title, 'Mom’s Pumpkin Roll');
+  assert.equal(byId('pumpkin-roll').family, 'pumpkin-roll');
+  assert.equal(byId('molasses-cookies').title, 'Molasses Cookies (ChatGPT Chewy)');
+  assert.ok(byId('molasses-cookies').favorite && byId('molasses-cookies').viewCount === 3);
+  assert.ok(byId('chocolate-chip-cookies-hersheys'));
 });

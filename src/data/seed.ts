@@ -1,14 +1,15 @@
 // The family library, imported from the Google Drive "Recipes" folder.
-// Each recipe's `source.file` names the file it came from. Comparison sheets
-// become one recipe (the version that was made or marked), with the other
-// versions summarized in its notes.
+// Each recipe's `source.file` names the file it came from. Each column of a
+// comparison sheet is its own recipe, grouped by `family` (see versions.ts).
 
 /** Bump when seed recipes change so existing browsers pick up new ones. */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 /** Example recipes from version 1 that are removed on upgrade if unedited. */
 export const RETIRED_EXAMPLES = ['lao-beef-larb', 'sticky-rice', 'garlic-butter-salmon', 'chicken-fried-rice'];
 
 import type { Category, Collection, LibrarySnapshot, Recipe } from '../types';
+import { recipe } from './seedHelpers';
+import { NEW_VERSIONS, VERSION_PATCHES } from './versions';
 
 const CATEGORY_NAMES: [string, number][] = [
   ['Beef', 8], ['Chicken', 42], ['Pork', 345], ['Seafood', 205], ['Pasta', 52],
@@ -23,29 +24,7 @@ export const seedCategories: Category[] = CATEGORY_NAMES.map(([name, hue]) => ({
 
 const day = 86400000;
 const now = Date.UTC(2026, 9, 11, 21);
-let n = 0;
-const lines = (prefix: string, items: string[]) =>
-  items.map((text) => {
-    const heading = text.startsWith('## ');
-    return { id: `${prefix}${++n}`, text: heading ? text.slice(3) : text, ...(heading ? { heading: true } : {}) };
-  });
-
-type SeedRecipe = Omit<Recipe, 'ingredients' | 'steps' | 'favorite' | 'viewCount' | 'cookCount' | 'updatedAt'> &
-  Partial<Pick<Recipe, 'favorite' | 'viewCount' | 'cookCount'>> & { ingredients: string[]; steps: string[] };
-
-function recipe(r: SeedRecipe): Recipe {
-  return {
-    favorite: false,
-    viewCount: 0,
-    cookCount: 0,
-    ...r,
-    updatedAt: r.createdAt,
-    ingredients: lines('i', r.ingredients),
-    steps: lines('s', r.steps),
-  };
-}
-
-export const seedRecipes: Recipe[] = [
+const importedRecipes: Recipe[] = [
   recipe({
     id: 'pizza-dough-poolish',
     title: 'Double-Fermented Pizza Dough',
@@ -1472,6 +1451,11 @@ export const seedRecipes: Recipe[] = [
     source: { label: 'Family version', file: 'Yellow cake recipes.xlsx' },
     createdAt: Date.UTC(2026, 1, 4),
   }),
+];
+
+export const seedRecipes: Recipe[] = [
+  ...importedRecipes.map((r) => (VERSION_PATCHES[r.id] ? { ...r, ...VERSION_PATCHES[r.id] } : r)),
+  ...NEW_VERSIONS,
 ];
 
 export const seedCollections: Collection[] = [
