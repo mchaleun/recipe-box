@@ -11,6 +11,7 @@ export type Route =
   | { name: 'recipe'; id: string }
   | { name: 'cook'; id: string }
   | { name: 'edit'; id: string }
+  | { name: 'compare'; a: string; b: string }
   | { name: 'settings' };
 
 export function parseHash(hash: string): Route {
@@ -22,6 +23,7 @@ export function parseHash(hash: string): Route {
     case 'cook': return parts[1] ? { name: 'cook', id: parts[1] } : { name: 'library' };
     case 'edit': return { name: 'edit', id: parts[1] ?? 'new' };
     case 'settings': return { name: 'settings' };
+    case 'compare': return parts[1] && parts[2] ? { name: 'compare', a: parts[1], b: parts[2] } : { name: 'library' };
     default: return { name: 'library' };
   }
 }
@@ -36,6 +38,7 @@ export function href(route: Route): string {
     case 'cook': return `#/cook/${encodeURIComponent(route.id)}`;
     case 'edit': return `#/edit/${encodeURIComponent(route.id)}`;
     case 'settings': return '#/settings';
+    case 'compare': return `#/compare/${encodeURIComponent(route.a)}/${encodeURIComponent(route.b)}`;
   }
 }
 

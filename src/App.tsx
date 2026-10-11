@@ -9,6 +9,7 @@ import { RecipeView } from './screens/RecipeView';
 import { CookingMode } from './screens/CookingMode';
 import { RecipeEditor } from './screens/RecipeEditor';
 import { Settings } from './screens/Settings';
+import { Compare } from './screens/Compare';
 
 const SECTIONS: { route: Route; label: string; icon: string }[] = [
   { route: { name: 'library' }, label: 'Recipes', icon: 'book' },
@@ -18,7 +19,7 @@ const SECTIONS: { route: Route; label: string; icon: string }[] = [
 
 function section(route: Route): string {
   if (route.name === 'collection') return 'collections';
-  if (route.name === 'recipe') return 'library';
+  if (route.name === 'recipe' || route.name === 'compare') return 'library';
   return route.name;
 }
 
@@ -87,6 +88,7 @@ export function App() {
         {route.name === 'recipe' && <RecipeView id={route.id} />}
         {route.name === 'edit' && <RecipeEditor id={route.id} />}
         {route.name === 'settings' && <Settings />}
+        {route.name === 'compare' && <Compare a={route.a} b={route.b} />}
       </div>
       {route.name !== 'edit' && <TabBar route={route} />}
       <SaveError />

@@ -53,3 +53,15 @@ test('detects timers in steps', () => {
   assert.deepEqual(detectTimers('Simmer 3 to 5 minutes, until thick.').map((t) => t.seconds), [180]);
   assert.deepEqual(detectTimers('Rest 1 hour, then refrigerate 16–24 hours.').map((t) => t.seconds), [3600, 57600]);
 });
+
+test('compare lines up matching ingredients', async () => {
+  const { matchIngredients } = await import('./compare');
+  const mk = (a: string[]) => a.map((text, i) => ({ id: String(i), text }));
+  const [both, onlyA, onlyB] = matchIngredients(
+    mk(['¾ cup granulated sugar', '¾ cup packed brown sugar', '1 tsp baking soda', '2 large eggs']),
+    mk(['1 cup brown sugar', '1 tsp baking powder', '1 egg + 1 yolk']),
+  );
+  assert.deepEqual(both.map((r) => [r.a?.text, r.b?.text]), [['¾ cup packed brown sugar', '1 cup brown sugar'], ['2 large eggs', '1 egg + 1 yolk']]);
+  assert.deepEqual(onlyA.map((r) => r.a?.text), ['¾ cup granulated sugar', '1 tsp baking soda']);
+  assert.deepEqual(onlyB.map((r) => r.b?.text), ['1 tsp baking powder']);
+});

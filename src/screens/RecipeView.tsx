@@ -7,6 +7,7 @@ import { goBack, navigate } from '../router';
 import { formatMinutes, relativeDay, totalMinutes } from '../lib/time';
 import { scaleIngredient } from '../lib/quantity';
 import { AddToCollectionSheet, CheckCircle } from './Collections';
+import { ComparePicker } from './Compare';
 import { searchFor } from './searchLink';
 
 export function ServingsStepper({ value, base, unit, onChange, large }: { value: number; base: number; unit?: string; onChange: (n: number) => void; large?: boolean }) {
@@ -61,6 +62,7 @@ export function RecipeView({ id }: { id: string }) {
   const toast = useToast();
   const progress = useProgress(recipe);
   const [collectionOpen, setCollectionOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -113,6 +115,7 @@ export function RecipeView({ id }: { id: string }) {
             <Menu items={[
               { label: 'Edit Recipe', icon: 'pencil', onSelect: () => navigate({ name: 'edit', id: recipe.id }) },
               { label: 'Add to Collection', icon: 'stack', onSelect: () => setCollectionOpen(true) },
+              { label: 'Compare With…', icon: 'columns', onSelect: () => setCompareOpen(true) },
               { label: 'Duplicate', icon: 'copy', onSelect: duplicate },
               ...(progress.hasChecks ? [{ label: 'Clear Checkmarks', icon: 'reset', onSelect: progress.clearChecks }] : []),
               { label: 'Delete Recipe', icon: 'trash', danger: true, divider: true, onSelect: () => setConfirmDelete(true) },
@@ -141,6 +144,9 @@ export function RecipeView({ id }: { id: string }) {
               </button>
               <button className="btn secondary lg" onClick={() => navigate({ name: 'edit', id: recipe.id })} aria-label="Edit recipe">
                 <Icon name="pencil" size={20} /> <span className="hide-sm">Edit</span>
+              </button>
+              <button className="btn secondary lg" onClick={() => setCompareOpen(true)} aria-label="Compare with another recipe">
+                <Icon name="columns" size={20} /> <span className="hide-sm">Compare</span>
               </button>
             </div>
           </div>
@@ -230,6 +236,7 @@ export function RecipeView({ id }: { id: string }) {
       </article>
 
       <AddToCollectionSheet open={collectionOpen} onClose={() => setCollectionOpen(false)} recipe={recipe} />
+      <ComparePicker open={compareOpen} onClose={() => setCompareOpen(false)} exclude={[recipe.id]} onPick={(other) => { setCompareOpen(false); navigate({ name: 'compare', a: recipe.id, b: other }); }} />
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete “${recipe.title}”?`} footer={
         <>
           <button className="btn secondary" onClick={() => setConfirmDelete(false)}>Cancel</button>
