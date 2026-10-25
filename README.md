@@ -24,7 +24,7 @@ React 19 + TypeScript + Vite, no UI framework. Plain CSS with design tokens
 | `src/data/repository.ts` | Storage: shared library over HTTP (online or home server), else IndexedDB in the browser |
 | `src/data/seed.ts` | The 36 family recipes imported from the Drive folder (bump `SEED_VERSION` when changing) |
 | `src/screens/Passcode.tsx` | Family passcode screen (online only; each device remembers it) |
-| `api/` | Vercel Functions: `library` (the shared library), `photo` (recipe photos), `health` |
+| `api/` | Vercel Functions: `library` (the shared library), `photo` (recipe photos), `scan` and `import` (fill in a new recipe from photos or a web link), `health` |
 | `server/index.mjs` | Alternative: a tiny home server that keeps the library in a JSON file |
 | `src/store.tsx` | All state changes (reducer) and autosave |
 | `src/lib/quantity.ts` | Parses "1 ½ cups", "½ cup + 2 Tbsp", "2–3", "300 g" and scales them |
@@ -56,6 +56,11 @@ Pushing to `main` on GitHub deploys automatically.
 - Scan a Recipe (`api/scan.ts`) reads recipe photos with Google Gemini when `GEMINI_API_KEY`
   is set (free key from aistudio.google.com, no card). Without it, it falls back to Vercel
   AI Gateway, which needs a card on the Vercel account.
+- Import from a Website (`api/import.ts`) reads the schema.org recipe data most recipe sites
+  publish (Food Network, NYT Cooking, Bon Appétit, most food blogs), with no AI needed. Pages
+  without it, and recipe text pasted in, go to the same AI reader as Scan. Some sites block
+  automated reads (Allrecipes and other People Inc sites, blogs behind Cloudflare); the app then
+  asks for the recipe text or a screenshot instead.
 - Writes are batched (3 s) and other devices pick up changes when the app is reopened
   or every 2 minutes, to stay well inside the free storage limits.
 

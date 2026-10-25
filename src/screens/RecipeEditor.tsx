@@ -39,7 +39,7 @@ function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 }
 
 /** Downscales a photo so the library stays fast and small. */
-function readPhoto(file: File, max = 1600): Promise<string> {
+function readPhoto(file: Blob, max = 1600): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -63,6 +63,8 @@ interface Scanned {
   title?: string; description?: string; servings?: number; yieldUnit?: string;
   prepMinutes?: number; cookMinutes?: number; ingredients?: string[]; steps?: string[];
   notes?: string; categories?: string[]; cuisine?: string; tags?: string[]; unreadable?: string;
+  /** Set by a web import. */
+  totalMinutes?: number; image?: string; source?: { label: string; url?: string };
 }
 
 const toLines = (items: string[] = []): Line[] =>
@@ -81,6 +83,71 @@ async function scanPhotos(files: File[], categories: string[]): Promise<Scanned>
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(out.error ?? 'Couldn’t read that photo. Try again.');
   return out.recipe as Scanned;
+}
+
+/** Sends a web page link to /api/import and returns the recipe it found. */
+async function importLink(url: string, categories: string[]): Promise<Scanned> {
+  const res = await fetch('/api/import', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-family-passcode': savedPasscode() },
+    body: JSON.stringify({ url, categories }),
+  }).catch(() => null);
+  if (!res) throw new Error('Can’t reach the recipe box right now. Check the internet connection.');
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error ?? 'Couldn’t read that page. Try again.');
+  return out.recipe as Scanned;
+}
+
+/** Copies the recipe's photo from the website (through the server, which the site allows). */
+async function importPhoto(image: string): Promise<string | undefined> {
+  const res = await fetch(`/api/import?image=${encodeURIComponent(image)}`, { headers: { 'x-family-passcode': savedPasscode() } }).catch(() => null);
+  if (!res?.ok) return undefined;
+  return readPhoto(await res.blob()).catch(() => undefined);
+}
+
+/** "Import from a website": paste a recipe link and the details fill in. */
+function ImportCard({ onImported }: { onImported: (r: Scanned) => void }) {
+  const { state } = useStore();
+  const [available, setAvailable] = useState(false);
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { getServerInfo().then((i) => setAvailable(!!i?.import)); }, []);
+  if (!available) return null;
+
+  const run = async (link = url) => {
+    if (!link.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    try { onImported(await importLink(link, state.categories.map((c) => c.name))); setUrl(''); }
+    catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="scan-card import-card" aria-busy={busy}>
+      <span className="scan-glyph"><Icon name="link" size={26} /></span>
+      <div className="grow">
+        <h2>{busy ? 'Reading the page…' : 'Import from a Website'}</h2>
+        <p className="secondary">{busy
+          ? 'This takes a few seconds. You can check everything before adding it.'
+          : 'Paste a link to a recipe from Food Network or most recipe sites. If a site won’t open, paste the recipe text instead.'}</p>
+      </div>
+      <form className="import-form" onSubmit={(e) => { e.preventDefault(); run(); }}>
+        <AutoTextarea
+          id="import-url" className="import-input" inputMode="url" enterKeyHint="go" autoComplete="off" autoCapitalize="off" spellCheck={false}
+          placeholder="Paste a recipe link" aria-label="Recipe link or text" value={url} disabled={busy}
+          onChange={(e) => { setUrl(e.target.value); setError(''); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run(); } }}
+          onPaste={(e) => { const t = e.clipboardData.getData('text').trim(); if (/^\S*https?:\/\/\S+$/i.test(t)) { e.preventDefault(); setUrl(t); run(t); } }}
+        />
+        <button className="btn primary" type="submit" disabled={busy || !url.trim()}>
+          {busy ? <span className="spinner" aria-label="Reading" /> : 'Import'}
+        </button>
+      </form>
+      {error && <p className="footnote import-error" role="alert">{error}</p>}
+    </div>
+  );
 }
 
 /** "Scan a recipe": a photo of a recipe card or cookbook page fills in the new recipe. */
@@ -301,16 +368,18 @@ export function RecipeEditor({ id }: { id: string }) {
       yieldUnit: r.yieldUnit?.trim() || d.yieldUnit,
       prepMinutes: n(r.prepMinutes) ?? d.prepMinutes,
       cookMinutes: n(r.cookMinutes) ?? d.cookMinutes,
+      totalMinutes: n(r.totalMinutes) ?? d.totalMinutes,
       ingredients: r.ingredients?.length ? toLines(r.ingredients) : d.ingredients,
       steps: r.steps?.length ? toLines(r.steps) : d.steps,
       notes: r.notes?.trim() || d.notes,
       cuisine: r.cuisine?.trim() || d.cuisine,
       categoryIds: [...new Set([...d.categoryIds, ...(r.categories ?? []).map((c) => byName.get(c.toLowerCase())).filter((id): id is string => !!id)])],
       tags: [...new Set([...d.tags, ...(r.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean)])].slice(0, 8),
-      source: d.source ?? { label: 'Scanned recipe' },
+      source: r.source?.label ? r.source : d.source ?? { label: 'Scanned recipe' },
     }));
     setScanNote(r.unreadable?.trim() ?? '');
     toast({ text: 'Recipe filled in. Check it, then tap Add.' });
+    if (r.image && !draft.photo) importPhoto(r.image).then((photo) => photo && setDraft((d) => (d.photo ? d : { ...d, photo })));
   };
 
   const addTag = (raw: string) => {
@@ -328,6 +397,7 @@ export function RecipeEditor({ id }: { id: string }) {
         end={<button className="text-btn strong" onClick={save} disabled={!draft.title.trim()}>{isNew ? 'Add' : 'Done'}</button>}
       />
       <div className="page editor page-enter">
+        {isNew && <ImportCard onImported={applyScan} />}
         {isNew && <ScanCard onScanned={applyScan} />}
         {scanNote && <p className="scan-note"><strong>Couldn’t read clearly:</strong> {scanNote}</p>}
         <div className="ed-top">
