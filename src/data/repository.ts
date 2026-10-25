@@ -92,6 +92,8 @@ export interface ServerInfo {
   auth?: boolean;
   /** Recipe photos can be scanned into new recipes. */
   scan?: boolean;
+  /** Recipes can be imported from a web page link. */
+  import?: boolean;
 }
 
 /** Talks to the shared library (the home server in server/index.mjs, or the

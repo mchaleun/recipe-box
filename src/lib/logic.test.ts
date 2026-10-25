@@ -99,3 +99,50 @@ test('upgrading an older library adds versions and keeps edits', () => {
   assert.ok(byId('molasses-cookies').favorite && byId('molasses-cookies').viewCount === 3);
   assert.ok(byId('chocolate-chip-cookies-hersheys'));
 });
+
+test('imports a recipe from a web page’s recipe data', async () => {
+  const { recipeFromHtml, isoMinutes, parseYield, pageText } = await import('../../api/_recipePage');
+  assert.equal(isoMinutes('PT1H30M'), 90);
+  assert.equal(isoMinutes('P0DT0H45M'), 45);
+  assert.equal(isoMinutes('P0Y0M0DT1H5M0.000S'), 65);
+  assert.deepEqual(parseYield(['24', '24 cookies']), { servings: 24, yieldUnit: 'cookies' });
+  assert.deepEqual(parseYield('6 to 8 servings'), { servings: 6, yieldUnit: '' });
+  const ld = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'WebPage', name: 'ignored' },
+      {
+        '@type': ['Recipe'], name: 'Perfect Pot Roast', description: '<p>Ree&#39;s Sunday classic &amp; more.</p>',
+        image: [{ '@type': 'ImageObject', url: '/small.jpg', width: 300 }, { '@type': 'ImageObject', url: '/big.jpg', width: 1200 }],
+        author: [{ '@type': 'Person', name: 'Ree Drummond' }], recipeYield: '6 servings',
+        prepTime: 'PT20M', cookTime: 'PT3H', totalTime: 'PT3H20M', recipeCategory: ['Main Dish', 'Beef'], recipeCuisine: 'American',
+        keywords: 'pot roast, beef, comfort food',
+        recipeIngredient: ['1 whole (3 to 5 pounds) chuck roast', '2 cups beef broth', '1 &frac12; cups red wine'],
+        recipeInstructions: [
+          { '@type': 'HowToSection', name: 'For the roast', itemListElement: [
+            { '@type': 'HowToStep', text: 'Preheat the oven to 275&deg;F.' },
+            { '@type': 'HowToStep', text: 'Sear the meat.<br>Turn it over.' },
+          ] },
+          'Serve with potatoes.',
+        ],
+      },
+    ],
+  };
+  const html = `<html><head><meta property="og:site_name" content="Food Network"><script type="application/ld+json">${JSON.stringify(ld)}</script></head></html>`;
+  const r = recipeFromHtml(html, 'https://www.foodnetwork.com/recipes/pot-roast', seedCategories.map((c) => c.name))!;
+  assert.equal(r.title, 'Perfect Pot Roast');
+  assert.equal(r.description, 'Ree\'s Sunday classic & more.');
+  assert.equal(r.servings, 6);
+  assert.equal(r.prepMinutes, 20);
+  assert.equal(r.cookMinutes, 180);
+  assert.equal(r.totalMinutes, 0);
+  assert.equal(r.ingredients[2], '1 ½ cups red wine');
+  assert.deepEqual(r.steps, ['## For the roast', 'Preheat the oven to 275°F.', 'Sear the meat.', 'Turn it over.', 'Serve with potatoes.']);
+  assert.deepEqual(r.categories, ['Beef']);
+  assert.equal(r.cuisine, 'American');
+  assert.equal(r.image, 'https://www.foodnetwork.com/big.jpg');
+  assert.equal(r.site, 'Food Network');
+  assert.equal(r.author, 'Ree Drummond');
+  assert.equal(recipeFromHtml('<html><body>No recipe here</body></html>', 'https://example.com/'), null);
+  assert.match(pageText('<html><head><title>Soup</title></head><body><nav>Menu</nav><p>Boil water.</p></body></html>', 'https://example.com/').text, /^Boil water\.$/);
+});
